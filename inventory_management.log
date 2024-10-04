@@ -1,0 +1,5 @@
+INFO 2024-10-04 17:17:31,651 autoreload Watching for file changes with StatReloader
+INFO 2024-10-04 17:17:34,476 autoreload C:\Users\satya\OneDrive\Desktop\inventory_management\inventory_management\settings.py changed, reloading.
+INFO 2024-10-04 17:17:36,009 autoreload Watching for file changes with StatReloader
+INFO 2024-10-04 17:18:11,219 autoreload C:\Users\satya\OneDrive\Desktop\inventory_management\inventory\views.py changed, reloading.
+INFO 2024-10-04 17:18:12,827 autoreload Watching for file changes with StatReloader
