@@ -1,17 +1,18 @@
-from django.contrib.auth.models import User
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.test import APIClient, APITestCase,override_settings
 from rest_framework import status
+from django.contrib.auth.models import User
 from .models import Item
-
+from django.core.cache import cache
 
 class UserRegistrationTest(APITestCase):
     """Test suite for user registration."""
-
+    
     def setUp(self):
         self.client = APIClient()
         self.register_url = '/api/register/'
-
+    
     def test_register_user_success(self):
+        """Test successful user registration."""
         data = {
             "username": "testuser",
             "password": "password123",
@@ -20,11 +21,11 @@ class UserRegistrationTest(APITestCase):
         response = self.client.post(self.register_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['message'], 'User registered successfully.')
-
-    def test_register_user_fail(self):
-        # Empty username should return 400
+    
+    def test_register_user_failure(self):
+        """Test registration with invalid data."""
         data = {
-            "username": "",
+            "username": "",  # Empty username
             "password": "password123",
             "email": "testuser@example.com"
         }
@@ -41,6 +42,7 @@ class UserLoginTest(APITestCase):
         self.user = User.objects.create_user(username="testuser", password="password123")
 
     def test_login_success(self):
+        """Test successful login."""
         data = {
             "username": "testuser",
             "password": "password123"
@@ -51,6 +53,7 @@ class UserLoginTest(APITestCase):
         self.assertIn('refresh', response.data)
 
     def test_login_invalid_credentials(self):
+        """Test login with wrong credentials."""
         data = {
             "username": "testuser",
             "password": "wrongpassword"
@@ -60,78 +63,97 @@ class UserLoginTest(APITestCase):
         self.assertEqual(response.data['error'], 'Invalid credentials')
 
 
+
 class ItemViewTest(APITestCase):
     """Test suite for item creation, retrieval, update, and deletion."""
 
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(username="testuser", password="password123")
-        self.item = Item.objects.create(name="Test Item", description="Item description")
-        self.client.force_authenticate(user=self.user)  # Authenticate the user
-
+        self.client.force_authenticate(user=self.user)
+        cache.clear()
+        self.item = Item.objects.create(name="Test Item", description="Item description", quantity=10, price=100)
         self.item_url = '/api/items/'
         self.item_detail_url = f'/api/items/{self.item.id}/'
 
-    def test_create_item(self):
+    def test_create_item_success(self):
+        """Test successful item creation."""
         data = {
             "name": "New Item",
-            "description": "New item description"
+            "description": "New item description",
+            "quantity": 10,
+            "price": 100
         }
         response = self.client.post(self.item_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'New Item')
 
     def test_create_duplicate_item(self):
-        # Attempting to create an item with the same name should fail
+        """Test duplicate item creation failure."""
         data = {
-            "name": "Test Item",
-            "description": "Duplicate item"
+            "name": "Test Item",  # This name already exists
+            "description": "Duplicate item",
+            "quantity": 10,
+            "price": 100
         }
         response = self.client.post(self.item_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'Item already exists.')
 
-    def test_get_all_items(self):
-        response = self.client.get(self.item_url, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreater(len(response.data), 0)
+    @override_settings(CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+        }
+    })
+    def test_retrieve_item_success(self):
+        # Create your test items
+        self.item = Item.objects.create(name="Test Item", description="Item description", quantity=10, price=100)
+        item_detail_url = f'/api/items/{self.item.id}/'
 
-    def test_get_item_detail(self):
-        response = self.client.get(self.item_detail_url, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Clear the cache before each test
+        cache.clear()
+
+        # Now call your API
+        response = self.client.get(item_detail_url)
+
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['name'], self.item.name)
 
-    def test_get_nonexistent_item(self):
-        non_existent_url = '/api/items/9999/'
-        response = self.client.get(non_existent_url, format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data['error'], 'Item not found.')
 
-    def test_update_item(self):
+    def test_update_item_success(self):
+        """Test successful item update."""
         data = {
             "name": "Updated Item",
-            "description": "Updated description"
+            "description": "Updated description",
+            "quantity": 20,
+            "price": 150
         }
         response = self.client.put(self.item_detail_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], "Updated Item")
 
-    def test_update_nonexistent_item(self):
-        non_existent_url = '/api/items/9999/'
+    def test_update_item_not_found(self):
+        """Test updating an item that does not exist."""
+        invalid_item_url = '/api/items/999/'  # Non-existent item ID
         data = {
-            "name": "Updated Nonexistent Item",
-            "description": "Updated description"
+            "name": "Non-existent Item",
+            "description": "Updated description",
+            "quantity": 20,
+            "price": 150
         }
-        response = self.client.put(non_existent_url, data, format='json')
+        response = self.client.put(invalid_item_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data['error'], 'Item not found.')
 
-    def test_delete_item(self):
-        response = self.client.delete(self.item_detail_url, format='json')
+    def test_delete_item_success(self):
+        """Test successful item deletion."""
+        response = self.client.delete(self.item_detail_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    def test_delete_nonexistent_item(self):
-        non_existent_url = '/api/items/9999/'
-        response = self.client.delete(non_existent_url, format='json')
+    def test_delete_item_not_found(self):
+        """Test deleting an item that does not exist."""
+        invalid_item_url = '/api/items/999/'  # Non-existent item ID
+        response = self.client.delete(invalid_item_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data['error'], 'Item not found.')

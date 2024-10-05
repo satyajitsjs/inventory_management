@@ -152,13 +152,11 @@ REST_FRAMEWORK = {
 
 CACHES = {
     'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',  # Change port and database number if needed
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
+
 
 # Add JWT token settings
 SIMPLE_JWT = {
@@ -172,7 +170,7 @@ SIMPLE_JWT = {
 }
 
 
-REDIS_HOST = '127.0.0.1'
+REDIS_HOST = '172.28.190.239'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_DECODER = True
