@@ -301,7 +301,6 @@ You can set these variables in your terminal or create a `.env` file and use a p
 - [Django REST Framework](https://www.django-rest-framework.org/) for building APIs
 - [PostgreSQL](https://www.postgresql.org/) for the database
 - [Redis](https://redis.io/) for caching
-- [OpenAI](https://openai.com/) for providing inspiration and resources
 
 ## Contact Information
 
